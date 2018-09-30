@@ -405,6 +405,57 @@ class TFT144:
                     cbuf[rpt+1+topleft] = bgcolor_lo
        self.write_data(cbuf)
 
+    # writes a sequence of chars without wrapping
+    # buffers all commands first
+    def put_chars(self, string, originx, y, fgcolor, bgcolor, font=3):
+        fgcolor_hi = fgcolor >> 8
+        fgcolor_lo = fgcolor & (~(65280))
+        bgcolor_hi = bgcolor >> 8
+        bgcolor_lo = bgcolor & (~(65280))
+        fontW = self.fontDim[font][0]
+        fontH = self.fontDim[font][1]
+        fontScale = self.fontDim[font][2]
+
+        cbuf = [0] * (fontW * fontH * 2 * len(string))
+        x = originx
+        for charid, character in enumerate(string):
+            character = ord(character)
+            if not (font == 3 or font == 4):  # restricted char set 32-126 for most
+                if character < 32 or character > 126:  # only strictly ascii chars
+                    character = 0
+                else:
+                    character -= 32
+
+            xx = [0]
+            if fontScale == 2:
+                xx = [0, 2, 2 * fontW, 2 + (2 * fontW)]  # DOUBLE: every pixel becomes a 2x2 pixel
+
+            for row in range(0, int(fontH // fontScale)):
+                for column in range(0, int(fontW // fontScale)):
+                    topleft = (((column + int(fontW // fontScale) * charid) * 2 * fontScale)
+                               + (row * 2 * fontW * fontScale * len(string)))
+                    if font <= 2:
+                        pixOn = (font4x6[character][row]) & (1 << column)
+                    elif font >= 7:
+                        pixOn = (font8x16[character][row]) & (1 << column)
+                    elif font >= 5:
+                        pixOn = (font8x12[character][row]) & (1 << column)
+                    else:
+                        pixOn = (font6x8[character][column]) & (1 << row)
+                    if pixOn:
+                        for rpt in xx:  # one pixel or a 2x2 "doubled" pixel
+                            cbuf[rpt + topleft] = fgcolor_hi
+                            cbuf[rpt + 1 + topleft] = fgcolor_lo
+                    else:
+                        for rpt in xx:
+                            cbuf[rpt + topleft] = bgcolor_hi
+                            cbuf[rpt + 1 + topleft] = bgcolor_lo
+
+            x += fontW
+
+        self.set_frame(originx, (originx + fontW * len(string) - 1), y, (y + fontH - 1))
+        self.write_command(WRITE_MEMORY_START)
+        self.write_data(cbuf)
 
     # writes a string in graphic x,y coordinates, with
     # foreground and background colours. If edge of screen is reached,
