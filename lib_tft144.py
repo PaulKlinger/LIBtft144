@@ -110,7 +110,13 @@ class TFT144:
     ORIENTATION180=192
     # Do you rotate the image, or the device?  :-)
 
-    def __init__(self, gpio, spidev, CE, dc_pin, rst_pin=0, led_pin=0, orientation=ORIENTATION0, isRedBoard=False, spi_speed=16000000):
+    # board types
+    BLACK_BOARD = 0
+    RED_BOARD = 1
+    NEW_RED_BOARD = 2  # new version of red board with less bezel and different boundaries
+
+    def __init__(self, gpio, spidev, CE, dc_pin, rst_pin=0, led_pin=0, orientation=ORIENTATION0, board_type=BLACK_BOARD,
+                 spi_speed=16000000):
         # CE is 0 or 1 for RPI, but is actual CE pin for virtGPIO
         # RST pin.  0  means soft reset (but reset pin still needs holding high (3V)
         # LED pin, may be tied to 3V (abt 14mA) or used on a 3V logic pin (abt 7mA)
@@ -119,7 +125,7 @@ class TFT144:
         GPIO = gpio
         self.SPI = spidev
         self.orientation = orientation
-        self.is_redboard = isRedBoard
+        self.board_type = board_type
         self.BLUE = self.colour565(0,0,255)
         self.GREEN = self.colour565(0,255, 0)
         self.RED = self.colour565(255,0,0)
@@ -249,13 +255,21 @@ class TFT144:
                 self.write_data([color_hi, color_lo] * TFTWIDTH)
 
     def set_frame(self, x1=0, x2=TFTWIDTH-1, y1=0, y2=TFTHEIGHT-1 ):
-       if self.is_redboard:
+       if self.board_type == self.RED_BOARD:
            if self.orientation==self.ORIENTATION0:
                y1 += 32
                y2 += 32
            if self.orientation==self.ORIENTATION90:
                x1 += 32
                x2 += 32
+       elif self.board_type == self.NEW_RED_BOARD:
+           if self.orientation == self.ORIENTATION180:
+               y1 += 3
+               y2 += 3
+               x1 += 2
+               x2 += 2
+            # TODO: fix other orientations
+
        self.write_command(SET_COLUMN_ADDRESS)
        self.write_data([0, x1, 0, x2])
        self.write_command(SET_PAGE_ADDRESS)
